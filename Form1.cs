@@ -90,7 +90,7 @@ namespace AVI_to_MP4_Converter
             {
                 if (String.IsNullOrEmpty(textBox1.Text))
                 {
-                    outputFile = fileInfo.Name;
+                    outputFile = Path.ChangeExtension(fileInfo.Name, null);
                 }
                 else outputFile = textBox1.Text;
             }
@@ -110,7 +110,7 @@ namespace AVI_to_MP4_Converter
         private void OnCheckboxValueChanged(object sender, EventArgs e)
         {
             CheckBox checkbox = (CheckBox)sender;
-            if (checkbox.Checked)
+            if (!checkbox.Checked)
             {
                 this.textBox1.Enabled = true;
             }
