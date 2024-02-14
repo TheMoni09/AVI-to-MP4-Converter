@@ -3,6 +3,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Media;
 using System.Text;
 using System.Windows.Forms;
 
@@ -11,10 +12,17 @@ namespace AVI_to_MP4_Converter
     public partial class Form1 : Form
     {
         private string path = "";
-        private bool outputDate = false;
-        private string outputFile = "";
-        private string outputPath = $"{Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)}\\Converter Output";
+        private bool FilenameAsDate = false;
+        private string ROOT_DIRECTORY = $"{Environment.GetFolderPath(Environment.SpecialFolder.MyVideos)}\\Converter Output";
         private Stopwatch stopwatch;
+        private string OutputPath;
+
+        public enum SoundOptions
+        {
+            None,
+            Exclamation,
+            Asterisk,
+        }
 
         public Form1()
         {
@@ -23,6 +31,12 @@ namespace AVI_to_MP4_Converter
 
         private void button1_Click(object sender, EventArgs e)
         {
+            if (FileExists())
+            {
+                DialogResult result = RaiseDialogBox("The output file already exist", icon: MessageBoxIcon.Warning);
+                if (result != DialogResult.OK) return;
+            }
+
             // Start a background thread for the conversion
             BackgroundWorker worker = new BackgroundWorker();
             worker.DoWork += OnConvert;
@@ -39,25 +53,27 @@ namespace AVI_to_MP4_Converter
             worker.RunWorkerAsync();
         }
 
+        private bool FileExists()
+        {
+            OutputPath = CreateOutputPath();
+
+            return File.Exists(OutputPath);
+        }
+
         private void ConversionCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             stopwatch.Stop();
 
-            System.Media.SystemSounds.Exclamation.Play();
-
-            string outputPathResult = e.Result as string;
-
             button1.Enabled = true;
             button2.Enabled = true;
             checkBox1.Enabled = true;
-            
-            if(!outputDate) textBox1.Enabled = true;
+            if(!FilenameAsDate) textBox1.Enabled = true;
 
             StringBuilder message = new StringBuilder();
             message.AppendLine($"Conversion Finished! Took: {stopwatch.Elapsed.Hours:D2}:{stopwatch.Elapsed.Minutes:D2}:{stopwatch.Elapsed.Seconds:D2}");
-            message.AppendLine($"Output Path: {outputPathResult}");
+            message.AppendLine($"Output Path: {OutputPath}");
 
-            DialogResult result = MessageBox.Show(message.ToString(), "Converter", MessageBoxButtons.OKCancel);
+            RaiseDialogBox(message.ToString());
         }
 
         private void button2_Click(object sender, EventArgs e)
@@ -75,16 +91,14 @@ namespace AVI_to_MP4_Converter
             OnUserOpenedInput(sender, e);
         }
 
-        private void OnConvert(object sender, DoWorkEventArgs e)
+        private string CreateOutputPath()
         {
-            var converter = new FFMpegConverter();
             FileInfo fileInfo = new FileInfo(path);
+            string outputFile;
 
-
-            if (outputDate)
+            if (FilenameAsDate)
             {
-                string formattedCreationDate = fileInfo.CreationTime.ToString("yyyy-MM-dd");
-                outputFile = formattedCreationDate;
+                outputFile = fileInfo.CreationTime.ToString("yyyy-MM-dd");
             }
             else
             {
@@ -95,16 +109,19 @@ namespace AVI_to_MP4_Converter
                 else outputFile = textBox1.Text;
             }
 
-            if(!Directory.Exists(outputPath))
+            return $"{ROOT_DIRECTORY}\\{outputFile}.mp4";
+        }
+
+        private void OnConvert(object sender, DoWorkEventArgs e)
+        {
+            var converter = new FFMpegConverter();
+
+            if (!Directory.Exists(ROOT_DIRECTORY))
             {
-                Directory.CreateDirectory(outputPath);
+                Directory.CreateDirectory(ROOT_DIRECTORY);
             }
 
-            string outputPathToFile = $"{outputPath}\\{outputFile}.mp4";
-
-            converter.ConvertMedia(path, outputPathToFile, "mp4");
-
-            e.Result = outputPathToFile;
+            converter.ConvertMedia(path, OutputPath, "mp4");
         }
 
         private void OnCheckboxValueChanged(object sender, EventArgs e)
@@ -116,7 +133,7 @@ namespace AVI_to_MP4_Converter
             }
             else this.textBox1.Enabled = false;
 
-            outputDate = checkbox.Checked;
+            FilenameAsDate = checkbox.Checked;
         }
 
         private void OnUserOpenedInput(object sender, CancelEventArgs e)
@@ -128,6 +145,31 @@ namespace AVI_to_MP4_Converter
         private void OnBrowseInput(object sender, EventArgs e)
         {
             openFileDialog1.ShowDialog(this);
+        }
+
+        private DialogResult RaiseDialogBox(string message,
+            SoundOptions sound = SoundOptions.None,
+            MessageBoxButtons btns = MessageBoxButtons.OKCancel,
+            string Title = "Converter", 
+            MessageBoxIcon icon = MessageBoxIcon.Information)
+        {
+            switch (sound)
+            {
+                case SoundOptions.Exclamation:
+                    SystemSounds.Exclamation.Play(); 
+                    break;
+                case SoundOptions.Asterisk: 
+                    SystemSounds.Asterisk.Play();
+                    break;
+                default:
+                    SystemSounds.Exclamation.Play();
+                    break;
+            }
+
+
+            DialogResult result = MessageBox.Show(message, Title, btns, icon);
+            
+            return result;
         }
     }
 }
